@@ -50,14 +50,18 @@ def encode(n, k, message):
 # ERROR INTRODUCTION - Debugged.
 def transmit(message, e):
     message = list(message)
+    error_locations = []
+    error_values = []
     for i in range(e):
         index_of_error_location = random.randint(0, len(message) - 1)
-        message[index_of_error_location] += random.randint(1, 250)
+        error_locations.append(index_of_error_location)
+        error_values.append(random.randint(1, 250))
+        message[index_of_error_location] += error_values[-1]
         message[index_of_error_location] = index_of_error_location % 251
 
     message = polynomial.Polynomial(message)
 
-    return message
+    return [message, error_locations, error_values]
 
 # DECODER
 def eval_mod_poly(coeffs, x, p=251):
@@ -177,15 +181,15 @@ def solve_elp(error_correcting_polynomial):
     print()
     return Xr
 
-def find_error_polynomial_coefficients_Yr(syndromes, Xr, p, n, k):
+def find_error_polynomial_coefficients_Yr(syndromes, Xr, p):
     augmented_matrix = []
-    for row_power in range(n-k):
+    for row_power in range(1, p+1):
         row = []
         for i in Xr:
             i = i**row_power
             i = i % 251
             row.append(i)
-        row.append(syndromes[row_power])
+        row.append(syndromes[row_power-1])
         augmented_matrix.append(row)
     print('Augmented matrix with Xr and syndromes vector')
     print(isaac_newton.matrix(augmented_matrix))
@@ -207,7 +211,7 @@ def find_error_polynomial_coefficients_Yr(syndromes, Xr, p, n, k):
         print(f">>> Reduced row {row_being_reduced}. New matrix:")
         print(augmented_matrix)
         # now need to add to all other rows
-        for row_to_add_to in range(1, p + 2):
+        for row_to_add_to in range(1, p + 1):
             if row_being_reduced == row_to_add_to:
                 continue
             else:
@@ -277,7 +281,7 @@ def decode(n, k, received):
     t = int(isaac_newton.floor((n-k)/2))
     error_correcting_polynomial = find_elp(syndromes, t)
     Xr = solve_elp(error_correcting_polynomial)
-    Yr = find_error_polynomial_coefficients_Yr(syndromes, Xr, len(Xr), n, k)
+    Yr = find_error_polynomial_coefficients_Yr(syndromes, Xr, len(Xr))
     error_polynomial_coeffs = generate_error_polynomial_coefficients(Xr, Yr, n)
     print()
     print("Received polynomial coeffs:")
@@ -291,35 +295,48 @@ def decode(n, k, received):
 
     return message_polynomial_coeffs
 
-codeword = encode(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-print()
-print("Codeword coefficients:")
-codeword_coeffs = list(int(i) for i in codeword.coef)
-print(codeword_coeffs)
-print()
+def run():
+    codeword = encode(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    print()
+    print("Codeword coefficients:")
+    codeword_coeffs = list(int(i) for i in codeword.coef)
+    print(codeword_coeffs)
+    print()
 
-print(f"Received word, containing errors. ")
-transmitted = transmit(codeword, 3)
-print(transmitted)
-print()
+    print(f"Received word, containing errors. ")
+    transmitted = transmit(codeword, 3)
+    print(transmitted)
+    print()
 
-decoded = decode(20, 10, transmitted)
-print()
-print("Decoded polynomial coeffs:")
-print(decoded)
-print()
-print("Codeword coefficients reminder:")
-codeword_coeffs = list(int(i) for i in codeword.coef)
-print(codeword_coeffs)
-print()
+    decoded = decode(20, 10, transmitted[0])
+    print()
+    print("Decoded polynomial coeffs:")
+    print(decoded)
+    print()
+    print("Codeword coefficients reminder:")
+    codeword_coeffs = list(int(i) for i in codeword.coef)
+    print(codeword_coeffs)
+    print()
+    print("Error locations (real):")
+    print(transmitted[1])
+    print("Error values (real):")
+    print(transmitted[2])
 
-if decoded == codeword_coeffs:
-    print("Success")
+    if decoded == codeword_coeffs:
+        print("Success! Codeword was error-corrected properly. ")
+        print()
+    else:
+        print("I'm sorry bro we've messed this one up. ")
+        exit(1)
+
+    print("Moving onto decoding the original message... ")
 
 
+def test():
+    find_error_polynomial_coefficients_Yr([3, 6, 9], [2, 3], 2)
 
-
-
+run()
+#test()
 
 
 
