@@ -36,12 +36,12 @@ def reduce_poly_mod_251(poly):
 
 def encode(n, k, message):
     if len(message) != k:
-        print(f"Invalid message length ({len(message)}).")
+        print(f"Invalid message length ({len(message)}). Should be {k} characters long. ")
         exit(1)
 
     for message_symbol in message:
         if not isinstance(message_symbol, int) or message_symbol > 250 or message_symbol < 0:
-            print("Your message is cooked")
+            print("Your message is cooked. Either your message contains non-integers, or the integers are over 250. Read README.")
             exit(1)
 
     # 1. Initiate message and the first root of the generator polynomial
@@ -56,7 +56,7 @@ def encode(n, k, message):
     # 3. Create final codeword safely modulo 251
     codeword_polynomial = polymul_mod(generator_polynomial, message_polynomial, 251)
 
-    print("Clean Codeword Polynomial:\n", codeword_polynomial)
+    print("Codeword polynomial:\n", codeword_polynomial)
     return codeword_polynomial
 
 # ERROR INTRODUCTION - Debugged.
@@ -177,13 +177,9 @@ def find_elp(syndromes, t):
 def solve_elp(error_correcting_polynomial):
     Xr_inverses = []
     for i in range(251):
-        # Get the raw float value
-        raw_val = error_correcting_polynomial(i)
-
-        # Check if the closest whole number modulo 251 equals 0
-        if abs(round(raw_val) - raw_val) < 1e-7:
-            if round(raw_val) % 251 == 0:
-                Xr_inverses.append(i)
+        val = eval_mod_poly(list(int(j) for j in error_correcting_polynomial.coef), i)
+        if val == 0:
+            Xr_inverses.append(i)
 
     print("Roots of the ELP, i.e., inverses of Xr's (error locations):", Xr_inverses)
     print(error_correcting_polynomial)
@@ -359,9 +355,15 @@ def find_message(decoded_coeff, n, k):
     print(message_coeffs)
     return message_coeffs
 
-def run(n, k, message, e):
-    codeword = encode(n, k, message)
+def demo(n, k, message, e):
+    print(f"Welcome to the RS encode-decode suite over F251. Running the demo for n={n}, k={k}. Encoding {message}. ")
     print()
+    codeword = encode(n, k, message)
+    suggested_e = isaac_newton.floor((n-k)/2)
+    if e > suggested_e:
+        print()
+        print(f"!!! Your proposed e = {e} is too large; in your case, RS can only correct up to {suggested_e} errors. Read README. ")
+        exit(1)
     print("Codeword coefficients:")
     codeword_coeffs = list(int(i) for i in codeword.coef)
     print(codeword_coeffs)
@@ -390,7 +392,7 @@ def run(n, k, message, e):
         print("Success! Codeword was error-corrected properly. ")
         print()
     else:
-        print("I'm sorry bro we've messed this one up. ")
+        print("I'm sorry bro, we've messed this one up. Codeword wasn't corrected properly. Contact devs.")
         exit(1)
 
     print("Moving onto decoding the original message... ")
@@ -398,11 +400,11 @@ def run(n, k, message, e):
     message_dec = find_message(decoded, n, k)
     if message == message_dec:
         print("This matches the original message. ")
-        print("Program terminated successfully. ")
+        print("Programme terminated successfully. ")
         exit(0)
     else:
         print("Looks like the message found doesn't match the original. Speak to the developer; you've found a bug!")
 
 
 # Example
-run(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
+demo(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)
