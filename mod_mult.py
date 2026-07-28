@@ -11,4 +11,4 @@ def plus(a, b):
 #print((7*250 + 8*2) % 251)
 
 #print(pow(21, 2, 251))
-print((6 + m(127, 247)) % 251)
+print(plus(127, -233))

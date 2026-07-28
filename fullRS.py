@@ -295,8 +295,73 @@ def decode(n, k, received):
 
     return message_polynomial_coeffs
 
-def run():
-    codeword = encode(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+from itertools import product
+
+def reduce_poly_mod_251(poly):
+    poly = list(int(i) for i in poly.coef)
+
+    for i in range(len(poly)):
+        poly[i] = poly[i] % 251
+
+    # convert back into polynomial
+    return polynomial.Polynomial(poly)
+
+def find_message(decoded_coeff, n, k):
+    generator_polynomial = polynomial.Polynomial([-int(alpha) % 251, 1])
+
+    for i in range(2, n - k + 1):
+        next_root_poly = polynomial.Polynomial([-pow(alpha, i, 251), 1])
+        generator_polynomial = polymul_mod(generator_polynomial, next_root_poly, 251)
+
+    print("Codeword polynomial")
+    print(polynomial.Polynomial(decoded_coeff))
+    print()
+    print("Generator polynomial:")
+    print(generator_polynomial)
+    print()
+    # Now need to divide decoded_coeff polynomial by generator_polynomial in F251...
+
+    message_coeffs = []
+    for i in range(n-k):
+        degree_being_reduced = n-i
+        coefficient_being_reduced = decoded_coeff[n-i-1]
+        # since the leading coefficient of the generator polynomial is 1, the subsequent
+        # coefficient of the quotient polynomial will simply be equal to coefficient_being_reduced.
+        message_coeffs.insert(0, coefficient_being_reduced)
+
+        # now need to actually subtract all the other crap.
+        # first, find the quotient monomial, i.e., the current element of the quotient polynomial.
+        # it will have degree n-1-i. Trust
+        # thus, the list must go to n-2-i, as 0 is included, so the n-2-ith element will be the coeff.
+
+        quotient_mono_coeffs = []
+        for j in range(n-k-i):
+            quotient_mono_coeffs.append(0)
+
+        quotient_mono_coeffs[n-k-1-i] = coefficient_being_reduced
+        quotient_mono = polynomial.Polynomial(quotient_mono_coeffs)
+        print("Current quotient monomial: ")
+        print(quotient_mono.trim())
+        print()
+
+        subtraction_polynomial = reduce_poly_mod_251(quotient_mono * generator_polynomial)
+
+        decoded_poly = reduce_poly_mod_251(polynomial.Polynomial(decoded_coeff) - subtraction_polynomial)
+
+        print("New (reduced) polynomial:")
+        print(decoded_poly)
+        decoded_coeff = list(int(i) for i in decoded_poly.coef)
+        print(decoded_coeff)
+        print()
+        print("Message:")
+        print(message_coeffs)
+
+
+
+
+
+def run(n, k, message, e):
+    codeword = encode(n, k, message)
     print()
     print("Codeword coefficients:")
     codeword_coeffs = list(int(i) for i in codeword.coef)
@@ -304,11 +369,11 @@ def run():
     print()
 
     print(f"Received word, containing errors. ")
-    transmitted = transmit(codeword, 3)
+    transmitted = transmit(codeword, e)
     print(transmitted)
     print()
 
-    decoded = decode(20, 10, transmitted[0])
+    decoded = decode(n, k, transmitted[0])
     print()
     print("Decoded polynomial coeffs:")
     print(decoded)
@@ -331,11 +396,13 @@ def run():
 
     print("Moving onto decoding the original message... ")
 
+    find_message(decoded, n, k)
+
 
 def test():
     find_error_polynomial_coefficients_Yr([3, 6, 9], [2, 3], 2)
 
-run()
+run(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
 #test()
 
 
