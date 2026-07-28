@@ -179,17 +179,17 @@ def solve_elp(error_correcting_polynomial):
 
 def find_error_polynomial_coefficients_Yr(syndromes, Xr, p, n, k):
     augmented_matrix = []
-    row_base = []
-    for i in range(1, p+1):
-        row_base.append(Xr[i])
-    for row_power in range(1, n-k+1):
+    for row_power in range(n-k):
         row = []
-        for i in row_base:
-            i = i**row_base
+        for i in Xr:
+            i = i**row_power
             i = i % 251
             row.append(i)
         row.append(syndromes[row_power])
         augmented_matrix.append(row)
+    print('Augmented matrix with Xr and syndromes vector')
+    print(isaac_newton.matrix(augmented_matrix))
+    print()
     # we've generated the raw LHS matrix with Xr's. Time to generate the matrix for syndromes on the RHS
 
     # great! time to do the scary bit. Gaussian elimination...
@@ -204,44 +204,59 @@ def find_error_polynomial_coefficients_Yr(syndromes, Xr, p, n, k):
         for i in range(p + 1):  # multiplying the row by the inverse
             augmented_matrix[row_being_reduced - 1][i] *= pivot_inverse
             augmented_matrix[row_being_reduced - 1][i] %= 251
-        print(f"reduced row {row_being_reduced}. New matrix:")
+        print(f">>> Reduced row {row_being_reduced}. New matrix:")
         print(augmented_matrix)
         # now need to add to all other rows
         for row_to_add_to in range(1, p + 2):
             if row_being_reduced == row_to_add_to:
                 continue
             else:
-                print("mirror of pivot in target row:")
-                print(augmented_matrix[row_to_add_to - 1][row_being_reduced - 1])
+                print(">>> Mirror of pivot in target row:")
+                # print(augmented_matrix[row_to_add_to - 1][row_being_reduced - 1])
                 how_many_times_to_add = 251 - augmented_matrix[row_to_add_to - 1][row_being_reduced - 1]
-                print(f"adding row {row_being_reduced} to row {row_to_add_to} exactly {how_many_times_to_add} times.")
+                print(f">>> Adding row {row_being_reduced} to row {row_to_add_to} exactly {how_many_times_to_add} times.")
                 for j in range(p + 1):
                     augmented_matrix[row_to_add_to - 1][j] += how_many_times_to_add * \
                                                               augmented_matrix[row_being_reduced - 1][j]
                     augmented_matrix[row_to_add_to - 1][j] %= 251
-                print(augmented_matrix)
+                print("Intermediate result:")
+                print(isaac_newton.matrix(augmented_matrix))
                 print()
+    print(">>> Finished Gaussian Elimination! ")
+    print(isaac_newton.matrix(augmented_matrix))
+    print()
 
     Yr = []
-    for i in range(n - k):
+    for i in range(len(Xr)):
         Yr.append(augmented_matrix[i][p])
-
+    print(">>> Yr's found:")
+    print(Yr)
+    print()
     return Yr
 
 def generate_error_polynomial_coefficients(Xr, Yr, n):
     ir = []
     for X in Xr:
         for i in range(250):
-            test = alpha ** i
+            test = pow(alpha, i, 251)
             if test == X:
                 ir.append(i)
 
+    print("Error locations (ir): ")
+    print(ir)
+    print()
+
+    # Generating base list for coefficients
     error_polynomial_coefficients = []
     for i in range(n):
         error_polynomial_coefficients.append(0)
 
     for i in range(len(Xr)):
-        error_polynomial_coefficients[ir[i]] = Xr[i]
+        error_polynomial_coefficients[ir[i]] = Yr[i]
+
+    print("Error polynomial coefficients")
+    print(error_polynomial_coefficients)
+    print()
 
     return error_polynomial_coefficients
 
@@ -262,12 +277,25 @@ def decode(n, k, received):
     t = int(isaac_newton.floor((n-k)/2))
     error_correcting_polynomial = find_elp(syndromes, t)
     Xr = solve_elp(error_correcting_polynomial)
-    Yr = find_error_polynomial_coefficients_Yr(syndromes, Xr, t, n, k)
-    error_polynomial = polynomial.Polynomial(generate_error_polynomial_coefficients(Xr, Yr, n))
-    message_polynomial = r_polynomial - error_polynomial
-    return list(message_polynomial.coef)
+    Yr = find_error_polynomial_coefficients_Yr(syndromes, Xr, len(Xr), n, k)
+    error_polynomial_coeffs = generate_error_polynomial_coefficients(Xr, Yr, n)
+    print()
+    print("Received polynomial coeffs:")
+    received_polynomial_coeffs = list(int(i) for i in r_polynomial.coef[0])
+    print(received_polynomial_coeffs)
+    print()
+
+    message_polynomial_coeffs = []
+    for i in range(n):
+        message_polynomial_coeffs.append((received_polynomial_coeffs[i] - error_polynomial_coeffs[i]) % 251)
+
+    return message_polynomial_coeffs
 
 codeword = encode(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+print()
+print("Codeword coefficients:")
+codeword_coeffs = list(int(i) for i in codeword.coef)
+print(codeword_coeffs)
 print()
 
 print(f"Received word, containing errors. ")
@@ -276,7 +304,18 @@ print(transmitted)
 print()
 
 decoded = decode(20, 10, transmitted)
+print()
+print("Decoded polynomial coeffs:")
 print(decoded)
+print()
+print("Codeword coefficients reminder:")
+codeword_coeffs = list(int(i) for i in codeword.coef)
+print(codeword_coeffs)
+print()
+
+if decoded == codeword_coeffs:
+    print("Success")
+
 
 
 
