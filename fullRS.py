@@ -3,6 +3,8 @@ import numpy as isaac_newton
 import random
 
 from sympy import Matrix
+import sympy
+from sympy.polys.matrices.exceptions import DMNonInvertibleMatrixError
 
 # Globals
 alpha = 6
@@ -22,6 +24,16 @@ def polymul_mod(poly1, poly2, modulus=251):
             res[i + j] = (res[i + j] + a * b) % modulus
 
     return polynomial.Polynomial(res)
+
+def reduce_poly_mod_251(poly):
+    poly = list(int(i) for i in poly.coef)
+
+    for i in range(len(poly)):
+        poly[i] = poly[i] % 251
+
+    # convert back into polynomial
+    return polynomial.Polynomial(poly)
+
 def encode(n, k, message):
     if len(message) != k:
         print(f"Invalid message length ({len(message)}).")
@@ -116,43 +128,45 @@ def find_elp(syndromes, t):
         try:
             inverse_syndromes_pxp_matrix_sympy = syndomes_pxp_matrix_sympy.inv_mod(251)
             inverse_syndromes_pxp_matrix = isaac_newton.matrix(inverse_syndromes_pxp_matrix_sympy)
-            break
-        except:
+
+            # finding ELP-coefficient matrix
+            syndomes_px1_matrix_raw = []
+            for i in range(p, 2 * p):
+                syndomes_px1_matrix_raw.append([-syndromes[i] % 251])
+            syndromes_px1_matrix = isaac_newton.matrix(syndomes_px1_matrix_raw)
+            print()
+            print(f"Syndromes {p}x1 vector:")
+            print(syndromes_px1_matrix)
+            print()
+
+            elp_coefficients_vector = isaac_newton.mod(inverse_syndromes_pxp_matrix * syndromes_px1_matrix, 251)
+            print("ELP coefficients vector:")
+            print(elp_coefficients_vector)
+            print()
+
+            check = syndomes_pxp_matrix * elp_coefficients_vector
+
+            print("Check")
+            print(check)
+            print()
+            if check.all() == syndromes_px1_matrix.all():
+                print("Hooray! The ELP check passes. ")
+                elp_coefficients = list(elp_coefficients_vector)
+                for i in range(len(elp_coefficients)):
+                    elp_coefficients[i] = int(elp_coefficients[i][0, 0])
+                elp_coefficients.reverse()
+                elp_coefficients.insert(0, 1)
+                print("ELP coeffcients:", elp_coefficients)
+                print()
+                break
+            else:
+                print(f"Check didn't pass! Looks like this {p}x{p} matrix is, indeed, invertible, but the real p is smaller. ")
+                continue
+
+        except sympy.matrices.exceptions.NonInvertibleMatrixError:
             print(">>> Failed... trying next p!")
             print()
             continue
-
-    if inverse_syndromes_pxp_matrix is None:
-        print("No p worked to create an invertible pxp matrix. ")
-        exit(1)
-    else:
-        print(">>> Success!")
-        print("Invertible matrix found for p = ", p, "; the inverted matrix is. ") # correct p now stored in this variable.
-        print(inverse_syndromes_pxp_matrix)
-        print()
-
-    # finding ELP-coefficient matrix
-    syndomes_px1_matrix_raw = []
-    for i in range(p, 2*p):
-        syndomes_px1_matrix_raw.append([-syndromes[i] % 251])
-    syndromes_px1_matrix = isaac_newton.matrix(syndomes_px1_matrix_raw)
-    print()
-    print(f"Syndromes {p}x1 vector:")
-    print(syndromes_px1_matrix)
-    print()
-
-    elp_coefficients_vector = isaac_newton.mod(inverse_syndromes_pxp_matrix * syndromes_px1_matrix, 251)
-    print("ELP coefficients vector:")
-    print(elp_coefficients_vector)
-    print()
-
-    elp_coefficients = list(elp_coefficients_vector)
-    for i in range(len(elp_coefficients)):
-        elp_coefficients[i] = int(elp_coefficients[i][0, 0])
-    elp_coefficients.reverse()
-    elp_coefficients.insert(0, 1)
-    print("ELP coeffcients:", elp_coefficients)
-    print()
 
     error_correcting_polynomial = polynomial.Polynomial(elp_coefficients)
     print("Error-correcting polynomial:")
@@ -264,7 +278,6 @@ def generate_error_polynomial_coefficients(Xr, Yr, n):
 
     return error_polynomial_coefficients
 
-
 def decode(n, k, received):
     print()
     print("Len received:", len(received))
@@ -294,17 +307,6 @@ def decode(n, k, received):
         message_polynomial_coeffs.append((received_polynomial_coeffs[i] - error_polynomial_coeffs[i]) % 251)
 
     return message_polynomial_coeffs
-
-from itertools import product
-
-def reduce_poly_mod_251(poly):
-    poly = list(int(i) for i in poly.coef)
-
-    for i in range(len(poly)):
-        poly[i] = poly[i] % 251
-
-    # convert back into polynomial
-    return polynomial.Polynomial(poly)
 
 def find_message(decoded_coeff, n, k):
     generator_polynomial = polynomial.Polynomial([-int(alpha) % 251, 1])
@@ -353,12 +355,9 @@ def find_message(decoded_coeff, n, k):
         decoded_coeff = list(int(i) for i in decoded_poly.coef)
         print(decoded_coeff)
         print()
-        print("Message:")
-        print(message_coeffs)
-
-
-
-
+    print("Error-corrected, decoded message:")
+    print(message_coeffs)
+    return message_coeffs
 
 def run(n, k, message, e):
     codeword = encode(n, k, message)
@@ -396,52 +395,14 @@ def run(n, k, message, e):
 
     print("Moving onto decoding the original message... ")
 
-    find_message(decoded, n, k)
+    message_dec = find_message(decoded, n, k)
+    if message == message_dec:
+        print("This matches the original message. ")
+        print("Program terminated successfully. ")
+        exit(0)
+    else:
+        print("Looks like the message found doesn't match the original. Speak to the developer; you've found a bug!")
 
 
-def test():
-    find_error_polynomial_coefficients_Yr([3, 6, 9], [2, 3], 2)
-
+# Example
 run(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 3)
-#test()
-
-
-
-"""
-augmented_matrix = [[1, 2, 3],
-                    [4, 5, 6],
-                    [7, 8, 9]]
-def test_gaussian_elim_mod_251(n, k, p, augmented_matrix):
-    for row_being_reduced in range(1, p + 1):
-        pivot = augmented_matrix[row_being_reduced - 1][row_being_reduced - 1]
-        print(pivot)# when row=1, this should return the 0,0 element (top left)
-
-        pivot_inverse = pow(pivot, -1, 251)
-        print(pivot_inverse)
-        for i in range(p + 1):  # multiplying the row by the inverse
-            augmented_matrix[row_being_reduced-1][i] *= pivot_inverse
-            augmented_matrix[row_being_reduced-1][i] %= 251
-        print(f"reduced row {row_being_reduced}. New matrix:")
-        print(augmented_matrix)
-        # now need to add to all other rows
-        for row_to_add_to in range(1, p + 2):
-            if row_being_reduced == row_to_add_to:
-                continue
-            else:
-                print("mirror of pivot in target row:")
-                print(augmented_matrix[row_to_add_to-1][row_being_reduced-1])
-                how_many_times_to_add = 251 - augmented_matrix[row_to_add_to-1][row_being_reduced-1]
-                print(f"adding row {row_being_reduced} to row {row_to_add_to} exactly {how_many_times_to_add} times.")
-                for j in range(p + 1):
-                    augmented_matrix[row_to_add_to-1][j] += how_many_times_to_add*augmented_matrix[row_being_reduced-1][j]
-                    augmented_matrix[row_to_add_to-1][j] %= 251
-                print(augmented_matrix)
-                print()
-
-    Yr = []
-    for i in range(n - k):
-        Yr.append(augmented_matrix[i][p])
-
-    return Yr
-print(test_gaussian_elim_mod_251(4, 1, 2, augmented_matrix))
-"""
