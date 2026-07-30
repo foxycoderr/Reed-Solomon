@@ -4,7 +4,6 @@ import random
 
 from sympy import Matrix
 import sympy
-from sympy.polys.matrices.exceptions import DMNonInvertibleMatrixError
 
 # Globals
 alpha = 6
@@ -69,7 +68,7 @@ def transmit(message, e):
         error_locations.append(index_of_error_location)
         error_values.append(random.randint(1, 250))
         message[index_of_error_location] += error_values[-1]
-        message[index_of_error_location] = index_of_error_location % 251
+        message[index_of_error_location] %= 251
 
     message = polynomial.Polynomial(message)
 
@@ -144,12 +143,13 @@ def find_elp(syndromes, t):
             print(elp_coefficients_vector)
             print()
 
-            check = syndomes_pxp_matrix * elp_coefficients_vector
+            check = isaac_newton.mod(syndomes_pxp_matrix * elp_coefficients_vector, 251)
 
             print("Check")
             print(check)
             print()
-            if check.all() == syndromes_px1_matrix.all():
+
+            if isaac_newton.array_equal(check, syndromes_px1_matrix):
                 print("Hooray! The ELP check passes. ")
                 elp_coefficients = list(elp_coefficients_vector)
                 for i in range(len(elp_coefficients)):
@@ -265,7 +265,10 @@ def generate_error_polynomial_coefficients(Xr, Yr, n):
     for i in range(n):
         error_polynomial_coefficients.append(0)
 
+    print("Xr")
+    print(len(Xr))
     for i in range(len(Xr)):
+        print(ir[i])
         error_polynomial_coefficients[ir[i]] = Yr[i]
 
     print("Error polynomial coefficients")
@@ -320,7 +323,7 @@ def find_message(decoded_coeff, n, k):
     # Now need to divide decoded_coeff polynomial by generator_polynomial in F251...
 
     message_coeffs = []
-    for i in range(n-k):
+    for i in range(k):
         degree_being_reduced = n-i
         coefficient_being_reduced = decoded_coeff[n-i-1]
         # since the leading coefficient of the generator polynomial is 1, the subsequent
@@ -333,10 +336,10 @@ def find_message(decoded_coeff, n, k):
         # thus, the list must go to n-2-i, as 0 is included, so the n-2-ith element will be the coeff.
 
         quotient_mono_coeffs = []
-        for j in range(n-k-i):
+        for j in range(k-i):
             quotient_mono_coeffs.append(0)
 
-        quotient_mono_coeffs[n-k-1-i] = coefficient_being_reduced
+        quotient_mono_coeffs[k-1-i] = coefficient_being_reduced
         quotient_mono = polynomial.Polynomial(quotient_mono_coeffs)
         print("Current quotient monomial: ")
         print(quotient_mono.trim())
@@ -374,6 +377,8 @@ def demo(n, k, message, e):
     print(transmitted)
     print()
 
+    print("!!!!!!!!!!!!!!!!!!!!!!!")
+    print(transmitted[0])
     decoded = decode(n, k, transmitted[0])
     print()
     print("Decoded polynomial coeffs:")
@@ -407,4 +412,12 @@ def demo(n, k, message, e):
 
 
 # Example
-demo(20, 10, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)
+demo(70, 20, [1, 2, 3, 6, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], 25)
+"""coeffs = [116, 104, 101, 32, 115, 101, 99, 114, 101, 116, 32, 112, 97, 115, 115, 119, 111, 114, 100, 32, 105, 115, 58, 32, 97, 112, 103, 121, 100, 106, 63, 101, 111, 119, 240, 108, 222, 42, 105, 117, 116, 113, 112, 114, 0, 0, 199, 0, 0, 0, 250, 123, 230, 222, 52, 2, 180, 230, 141, 192, 161, 191, 238, 212, 220, 142, 6, 112, 20, 164]
+reverse_coeffs = list(reversed(coeffs))
+print(reverse_coeffs)
+msg = polynomial.Polynomial(reverse_coeffs)
+decoded_coeffs = decode(70, 20, msg)
+print(find_message(decoded_coeffs, 70, 20))
+message = find_message(decoded_coeffs, 70, 20)
+print(bytes(message).decode('latin1'))"""
